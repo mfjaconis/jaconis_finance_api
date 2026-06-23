@@ -1,0 +1,109 @@
+[ ] Cadastrar Usuário
+- id
+- email
+- senha
+- nome
+
+[ ] Login
+- email
+- senha
+- token (JWT)
+
+[ ] Instituições
+- id
+- nome
+
+[ ] Cadastrar Despesas
+- nome
+- tipo de despesa (fixa ou variável)
+- código da instituição (SELECIONAR no frontend, será exibido o nome da instituição)
+- uso (cartão, pix, boleto, etc.)
+- categoria (Casa, Educação, Lazer, etc.)
+- quantidade de parcela
+- valor total
+- valor da parcela (se for parcelado (valor total / quantidade de parcela))
+- Nome do responsavel financeiro
+- descrição
+
+[ ] Cadastrar Categorias
+- nome
+- descrição
+
+scheam:
+user:{
+  id: UUID;
+  email: string;
+  password: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+creditor:{
+  id: UUID;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+category:{
+  id: UUID;
+  name: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+expense:{
+  id: UUID;
+  name: string;
+  typeExpenseId: REFERENCES typeExpense(id);
+  creditor: REFERENCES institution(id);
+  type: string;
+  categoryId: REFERENCES category(id);
+  quantity: number;
+  value: number;
+  valuePerInstallment: number;
+  responsibleFinance: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
+enum type:{
+  CARTAO,
+  PIX,
+  BOLETO,
+  TED,
+  FINANCIAMENTO
+}
+
+enum typeExpense:{
+  FIXA,
+  VARIAVEL,
+}
+
+addInitalCategories:{
+Casa,
+Educação,
+Lazer,
+Transporte,
+Saúde,
+Outros
+}
+
+
+
+Ex GPT:
+{
+  "id": 1,
+  "description": "Empréstimo Nubank",
+  "creditor": "Nubank",
+  "category": "Financeiro",
+  "total_amount": 12000,
+  "interest_rate": 2.99,
+  "installments": 12,
+  "start_date": "2026-05-10",
+  "status": "OPEN"
+}

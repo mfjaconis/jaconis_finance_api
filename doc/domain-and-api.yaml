@@ -1,0 +1,224 @@
+# Finance API — Domain Model & REST API Specification
+# All user-owned data is scoped by userId. Users can only CRUD their own records.
+
+# =============================================================================
+# FEATURES (MVP)
+# =============================================================================
+
+[ ] Register User
+    - id
+    - email
+    - password
+    - name
+
+[ ] Login
+    - email
+    - password
+    - returns JWT token
+
+[ ] Creditors
+    - id
+    - userId
+    - name
+
+[ ] Financial Responsibles
+    - id
+    - userId
+    - name
+    - who pays the expense (e.g. self, spouse) — select on frontend
+
+[ ] Expenses
+    - name
+    - expense type (fixed or variable)
+    - creditor id (select on frontend; display creditor name)
+    - payment method (card, pix, bank slip, etc.)
+    - category (Casa, Educação, Lazer, etc.)
+    - installment count (number of installments)
+    - installment amount (value per installment — stored in DB)
+    - total amount (computed: installmentCount * installmentAmount)
+    - financial responsible id (who will pay)
+    - description
+
+[ ] Categories
+    - name
+    - description
+
+# =============================================================================
+# SCHEMA
+# =============================================================================
+
+user: {
+  id: UUID;
+  email: string;
+  passwordHash: string;       # never exposed in API responses
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+creditor: {
+  id: UUID;
+  userId: UUID;                 # REFERENCES user(id)
+  name: string;
+  dueDay: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+financialResponsible: {
+  id: UUID;
+  userId: UUID;                 # REFERENCES user(id)
+  name: string;                 # e.g. user's own name, spouse name
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+category: {
+  id: UUID;
+  userId: UUID;                 # REFERENCES user(id)
+  name: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+expense: {
+  id: UUID;
+  userId: UUID;                 # REFERENCES user(id)
+  name: string;
+  expenseType: ExpenseType;     # enum, not a separate table
+  creditorId: UUID;             # REFERENCES creditor(id), must belong to same userId
+  paymentMethod: PaymentMethod; # enum
+  categoryId: UUID;             # REFERENCES category(id), must belong to same userId
+  installmentCount: number;     # quantity of installments (minimum 1)
+  installmentAmount: number;    # value per installment — stored; decimal, minimum > 0
+  financialResponsibleId: UUID; # REFERENCES financialResponsible(id), must belong to same userId
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+# totalAmount is NOT stored — computed as installmentCount * installmentAmount
+
+# =============================================================================
+# ENUMS (type names in English; values in Brazilian Portuguese)
+# =============================================================================
+
+enum PaymentMethod: {
+  CARTAO,
+  PIX,
+  BOLETO,
+  TED,
+  FINANCIAMENTO
+}
+
+enum ExpenseType: {
+  FIXA,
+  VARIAVEL
+}
+
+# =============================================================================
+# INITIAL DATA (seeded per user on registration)
+# =============================================================================
+
+initialCategories: {
+  Casa,
+  Educação,
+  Lazer,
+  Transporte,
+  Saúde,
+  Outros
+}
+
+# on register, also seed one financialResponsible with the user's name (isOwner: optional future flag)
+
+# =============================================================================
+# REST API (all protected routes require JWT; userId from token, never from body)
+# =============================================================================
+
+auth:
+  POST   /api/v1/auth/register     # public — creates user + seeds initial categories + default financialResponsible
+  POST   /api/v1/auth/login        # public — returns JWT
+
+creditors:
+  GET    /api/v1/creditors
+  GET    /api/v1/creditors/{id}
+  POST   /api/v1/creditors
+  PUT    /api/v1/creditors/{id}
+  PATCH  /api/v1/creditors/{id}
+  DELETE /api/v1/creditors/{id}    # block if referenced by expenses
+
+financial-responsibles:
+  GET    /api/v1/financial-responsibles
+  GET    /api/v1/financial-responsibles/{id}
+  POST   /api/v1/financial-responsibles
+  PUT    /api/v1/financial-responsibles/{id}
+  PATCH  /api/v1/financial-responsibles/{id}
+  DELETE /api/v1/financial-responsibles/{id}   # block if referenced by expenses
+
+categories:
+  GET    /api/v1/categories
+  GET    /api/v1/categories/{id}
+  POST   /api/v1/categories
+  PUT    /api/v1/categories/{id}
+  PATCH  /api/v1/categories/{id}
+  DELETE /api/v1/categories/{id}   # block if referenced by expenses
+
+expenses:
+  GET    /api/v1/expenses          # optional filters: categoryId, expenseType, paymentMethod, financialResponsibleId
+  GET    /api/v1/expenses/{id}
+  POST   /api/v1/expenses
+  PUT    /api/v1/expenses/{id}
+  PATCH  /api/v1/expenses/{id}
+  DELETE /api/v1/expenses/{id}
+
+# =============================================================================
+# SECURITY & DATA ISOLATION
+# =============================================================================
+
+rules:
+  - userId is always taken from JWT (SecurityContext), never from request body or query
+  - every repository query for user-owned entities filters by userId
+  - findByIdAndUserId(id, userId) on GET, PUT, PATCH, DELETE to prevent IDOR
+  - password stored with BCrypt; never returned in any response
+  - use DTOs for request/response; do not expose JPA entities directly
+  - validate that creditorId, categoryId and financialResponsibleId belong to the authenticated user before saving expense
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+expense:
+  - installmentCount >= 1 (1 = single payment, no installments)
+  - installmentAmount > 0
+  - totalAmount = installmentCount * installmentAmount (computed in service or response DTO)
+  - creditorId, categoryId and financialResponsibleId must reference records owned by the same userId
+
+financialResponsible:
+  - name required, unique per userId (optional constraint)
+  - on user registration, create one record with the user's name as default payer
+
+creditor:
+  - name required, unique per userId (optional constraint)
+
+category:
+  - name required, unique per userId (optional constraint)
+
+delete:
+  - cannot delete creditor, category or financialResponsible if still referenced by an expense
+
+# =============================================================================
+# FUTURE (out of MVP scope)
+# =============================================================================
+
+# Loan/financing model with interest rate, start date, and status — separate from simple expenses:
+# {
+#   "description": "Empréstimo Nubank",
+#   "creditor": "Nubank",
+#   "category": "Financeiro",
+#   "totalAmount": 12000,
+#   "interestRate": 2.99,
+#   "installments": 12,
+#   "startDate": "2026-05-10",
+#   "status": "OPEN"
+# }
