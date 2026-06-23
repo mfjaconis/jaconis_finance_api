@@ -141,7 +141,7 @@ flowchart LR
 | **Objetivo** | Entidade `User` persistida no PostgreSQL com repository funcional |
 | **Pré-requisitos** | Etapa 0 concluída |
 | **Conceitos para aprender** | **Entity** (`@Entity`, `@Table`, `@Id`); **UUID** como chave primária; **@Column** e constraints (`unique` em email); **Spring Data JPA Repository** (`JpaRepository<User, UUID>`); **Auditing** (`@CreatedDate`, `@LastModifiedDate`); diferença entre campo `password` (transiente no registro) e `passwordHash` (persistido) |
-| **Tarefas** | - [ ] Criar entidade `User` conforme spec: `id`, `email`, `passwordHash`, `name`, `createdAt`, `updatedAt`<br>- [ ] Migration Flyway `V*__create_users.sql` com tabela `users` e índice único em `email`<br>- [ ] Criar `UserRepository extends JpaRepository<User, UUID>` com `Optional<User> findByEmail(String email)`<br>- [ ] Configurar geração de UUID (`@GeneratedValue` ou `@PrePersist`)<br>- [ ] (Opcional) teste de integração `@DataJpaTest` salvando e buscando um user |
+| **Tarefas** | - [ ] Criar entidade `User` conforme spec: `id`, `email`, `passwordHash`, `createdAt`, `updatedAt`<br>- [ ] Migration Flyway `V*__create_users.sql` com tabela `users` e índice único em `email`<br>- [ ] Criar `UserRepository extends JpaRepository<User, UUID>` com `Optional<User> findByEmail(String email)`<br>- [ ] Configurar geração de UUID (`@GeneratedValue` ou `@PrePersist`)<br>- [ ] (Opcional) teste de integração `@DataJpaTest` salvando e buscando um user |
 | **Arquivos/pacotes** | `domain/User.java`<br>`repository/UserRepository.java`<br>`db/migration/V*__create_users.sql`<br>`config/JpaAuditingConfig.java` |
 | **Libs novas** | Nenhuma — JPA e PostgreSQL já estão no `pom.xml` |
 | **Como validar** | `.\mvnw.cmd test`<br>Inspecionar tabela no banco: `docker compose exec postgres psql -U postgres -d finance-api -c "\dt"`<br>App sobe com `ddl-auto=validate` sem erro de schema |
@@ -158,7 +158,7 @@ flowchart LR
 | **Objetivo** | Padronizar entrada/saída da API com DTOs validados, sem expor entidades JPA |
 | **Pré-requisitos** | Etapa 1 |
 | **Conceitos para aprender** | **DTO** (Data Transfer Object); anotações `@NotBlank`, `@Email`, `@Size`, `@Min`, `@Positive`; `@Valid` no controller; **record** vs classe para DTOs imutáveis; mapper manual (método estático ou componente) vs MapStruct (futuro — MVP usa manual) |
-| **Tarefas** | - [ ] Criar `RegisterRequest` (email, password, name) com validações<br>- [ ] Criar `UserResponse` (id, email, name, createdAt) — **sem** password/hash<br>- [ ] Criar `LoginRequest` (email, password)<br>- [ ] Criar `AuthResponse` ou `TokenResponse` (token, opcionalmente dados mínimos do user)<br>- [ ] Criar classe utilitária ou métodos `toEntity` / `toResponse` no service (não no controller)<br>- [ ] Documentar convenção: requests em `dto/request`, responses em `dto/response` |
+| **Tarefas** | - [ ] Criar `RegisterRequest` (email, password) com validações<br>- [ ] Criar `UserResponse` (id, email, createdAt) — **sem** password/hash<br>- [ ] Criar `LoginRequest` (email, password)<br>- [ ] Criar `AuthResponse` ou `TokenResponse` (token, opcionalmente dados mínimos do user)<br>- [ ] Criar classe utilitária ou métodos `toEntity` / `toResponse` no service (não no controller)<br>- [ ] Documentar convenção: requests em `dto/request`, responses em `dto/response` |
 | **Arquivos/pacotes** | `dto/request/RegisterRequest.java`, `LoginRequest.java`<br>`dto/response/UserResponse.java`, `TokenResponse.java` |
 | **Libs novas** | Nenhuma — `spring-boot-starter-validation` já presente |
 | **Como validar** | Compilação: `.\mvnw.cmd compile`<br>Teste manual posterior na etapa 4 com payload inválido → 400 (após etapa 3) |
@@ -192,10 +192,10 @@ flowchart LR
 | **Objetivo** | Endpoints públicos de registro e login; rotas protegidas exigem JWT; senha com Argon2; seed de dados iniciais no registro |
 | **Pré-requisitos** | Etapas 1–3 |
 | **Conceitos para aprender** | **Spring Security Filter Chain**; **stateless** vs sessão; **JWT** (header.payload.signature); **PasswordEncoder**; **Argon2** vs BCrypt; **SecurityContext** e `Authentication`; **CORS** básico se necessário para frontend futuro |
-| **Tarefas** | - [ ] Adicionar dependência JWT (ver Libs novas)<br>- [ ] Bean `PasswordEncoder` → `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` (**não** BCrypt da spec original)<br>- [ ] `AuthService`: register (hash senha, salvar user), login (verificar senha, emitir JWT)<br>- [ ] No register: seed das 6 categorias iniciais (Casa, Educação, Lazer, Transporte, Saúde, Outros) e 1 `FinancialResponsible` com o nome do usuário<br>- [ ] `JwtService`: gerar token com `subject` = userId (ou email + claim `userId`); validar expiração e assinatura<br>- [ ] `JwtAuthenticationFilter` antes de `UsernamePasswordAuthenticationFilter`<br>- [ ] `SecurityConfig`: `POST /api/v1/auth/register` e `login` públicos; demais `/api/v1/**` autenticados; `SessionCreationPolicy.STATELESS`<br>- [ ] `AuthController`: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`<br>- [ ] Helper `SecurityUtils.getCurrentUserId()` lendo do SecurityContext<br>- [ ] Criar entidades/repositories mínimos de `Category` e `FinancialResponsible` **somente** para o seed (CRUD completo vem nas etapas 6–7)<br>- [ ] Documentar no código/comentário: Argon2 escolhido em vez de BCrypt |
+| **Tarefas** | - [ ] Adicionar dependência JWT (ver Libs novas)<br>- [ ] Bean `PasswordEncoder` → `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` (**não** BCrypt da spec original)<br>- [ ] `AuthService`: register (hash senha, salvar user), login (verificar senha, emitir JWT)<br>- [ ] No register: seed das 6 categorias iniciais (Casa, Educação, Lazer, Transporte, Saúde, Outros) e 1 `FinancialResponsible` com nome padrão "Titular"<br>- [ ] `JwtService`: gerar token com `subject` = userId (ou email + claim `userId`); validar expiração e assinatura<br>- [ ] `JwtAuthenticationFilter` antes de `UsernamePasswordAuthenticationFilter`<br>- [ ] `SecurityConfig`: `POST /api/v1/auth/register` e `login` públicos; demais `/api/v1/**` autenticados; `SessionCreationPolicy.STATELESS`<br>- [ ] `AuthController`: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`<br>- [ ] Helper `SecurityUtils.getCurrentUserId()` lendo do SecurityContext<br>- [ ] Criar entidades/repositories mínimos de `Category` e `FinancialResponsible` **somente** para o seed (CRUD completo vem nas etapas 6–7)<br>- [ ] Documentar no código/comentário: Argon2 escolhido em vez de BCrypt |
 | **Arquivos/pacotes** | `config/SecurityConfig.java`, `config/JwtAuthenticationFilter.java`<br>`service/AuthService.java`, `service/JwtService.java`<br>`controller/AuthController.java`<br>`domain/Category.java`, `domain/FinancialResponsible.java` (mínimo)<br>`repository/CategoryRepository.java`, `FinancialResponsibleRepository.java`<br>Migrations para `categories`, `financial_responsibles` |
 | **Libs novas** | **JJWT** (`io.jsonwebtoken:jjwt-api`, `jjwt-impl`, `jjwt-jackson` — runtime) — biblioteca madura, ampla documentação para Spring Boot + JWT manual.<br>**Alternativa descartada:** Spring Authorization Server — poderoso demais para login simples email/senha; curva de aprendizado alta.<br>**Alternativa descartada:** Sessão HTTP — spec exige JWT; não escala igual em APIs stateless. |
-| **Como validar** | `docker compose up -d`<br>`.\mvnw.cmd spring-boot:run`<br>Registrar usuário (curl/Postman):<br>`Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/auth/register -ContentType "application/json" -Body '{"email":"a@b.com","password":"senha123","name":"Maria"}'`<br>Login e copiar token<br>Chamar endpoint protegido sem token → `401`<br>Com `Authorization: Bearer <token>` → `200` (quando CRUD existir) |
+| **Como validar** | `docker compose up -d`<br>`.\mvnw.cmd spring-boot:run`<br>Registrar usuário (curl/Postman):<br>`Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/v1/auth/register -ContentType "application/json" -Body '{"email":"a@b.com","password":"senha123"}'`<br>Login e copiar token<br>Chamar endpoint protegido sem token → `401`<br>Com `Authorization: Bearer <token>` → `200` (quando CRUD existir) |
 | **Definition of Done** | Register cria user + categorias + financial responsible padrão; login retorna JWT; senha armazenada com Argon2; `userId` disponível no service via SecurityContext |
 | **Erros comuns** | Colocar segredo JWT fixo no código — usar `application.properties` ou env var<br>Esquecer de liberar `/auth/**` no SecurityConfig → register retorna 401<br>Confundir `sub` do JWT com email quando o filtro espera UUID |
 | **Perguntas de revisão** | Por que JWT stateless em vez de sessão no servidor?<br>O que impede um usuário de alterar o `userId` no body da requisição?<br>Por que Argon2 é preferível ao BCrypt hoje? |
@@ -433,7 +433,7 @@ Marque quando **todo** o item estiver pronto:
 
 ### Regras de negócio
 
-- [ ] Register seed: 6 categorias + 1 financial responsible com nome do usuário
+- [ ] Register seed: 6 categorias + 1 financial responsible "Titular"
 - [ ] `installmentCount >= 1`, `installmentAmount > 0`
 - [ ] `totalAmount` calculado na response (não persistido)
 - [ ] FKs de Expense validadas por ownership do usuário
@@ -459,10 +459,10 @@ Marque quando **todo** o item estiver pronto:
 
 | Recurso | Campos principais | Observação |
 |---------|-------------------|------------|
-| User | email, passwordHash, name | Auth na etapa 4 |
+| User | email, passwordHash | Auth na etapa 4 |
 | Category | name, description | Seed no register |
 | Creditor | name, **dueDay** | dueDay no schema |
-| FinancialResponsible | name | Seed com nome do user |
+| FinancialResponsible | name | Seed "Titular" no register |
 | Expense | enums, FKs, installments | totalAmount calculado |
 
 **Enums:** `ExpenseType` (FIXA, VARIAVEL); `PaymentMethod` (CARTAO, PIX, BOLETO, TED, FINANCIAMENTO)

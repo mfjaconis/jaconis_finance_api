@@ -9,7 +9,6 @@
     - id
     - email
     - password
-    - name
 
 [ ] Login
     - email
@@ -51,7 +50,6 @@ user: {
   id: UUID;
   email: string;
   passwordHash: string;       # never exposed in API responses
-  name: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,7 +66,7 @@ creditor: {
 financialResponsible: {
   id: UUID;
   userId: UUID;                 # REFERENCES user(id)
-  name: string;                 # e.g. user's own name, spouse name
+  name: string;                 # e.g. Titular, spouse name
   createdAt: Date;
   updatedAt: Date;
 }
@@ -130,7 +128,7 @@ initialCategories: {
   Outros
 }
 
-# on register, also seed one financialResponsible with the user's name (isOwner: optional future flag)
+# on register, also seed one financialResponsible named "Titular" as default payer (isOwner: optional future flag)
 
 # =============================================================================
 # REST API (all protected routes require JWT; userId from token, never from body)
@@ -196,7 +194,7 @@ expense:
 
 financialResponsible:
   - name required, unique per userId (optional constraint)
-  - on user registration, create one record with the user's name as default payer
+  - on user registration, create one record named "Titular" as default payer
 
 creditor:
   - name required, unique per userId (optional constraint)
